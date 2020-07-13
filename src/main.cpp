@@ -43,9 +43,6 @@ TOTAL MIX ESP32 Controller
 #define TIME_DELAY 100
 
 // Settings for display drawing
-#define BACKGROUND_COLOR TFT_BLACK
-#define TEXT_COLOR TFT_WHITE
-
 #define DISPLAY_COLOUR TFT_BLACK
 #define DISPLAY_MUTED_COLOUR TFT_RED
 #define DISPLAY_TEXT_COLOUR TFT_WHITE
@@ -170,7 +167,7 @@ void setup() {
   tft.setSwapBytes(true); // Swap the byte order for pushImage() - corrects endianness
   tft.setRotation(1);
   tft.setTextDatum(TL_DATUM); // Top Left
-  tft.setTextColor(TEXT_COLOR);
+  tft.setTextColor(DISPLAY_TEXT_COLOUR);
 
   // Update the Display
   DisplayRefresh();
