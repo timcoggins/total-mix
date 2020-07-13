@@ -2,7 +2,7 @@
 
 Totalmix Controller
 
-MCU: ESP32 TTGO T-Display
+Board: ESP32 TTGO T-Display
 
 Pins:
 - 22    MIDI DATA
