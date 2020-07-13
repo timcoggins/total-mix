@@ -1,4 +1,10 @@
-// Includes
+/*
+
+TOTAL MIX ESP32 Controller
+
+*/
+
+// INCLUDES
 #include <Arduino.h>
 #include <SPI.h>
 #include <FS.h>
@@ -6,51 +12,51 @@
 #include <TFT_eSPI.h>
 #include <Button2.h>
 
-// TTGO Buttons
-#define BUTTON_1 35
-#define BUTTON_2 0
 
-// Define Serial Port for MIDI (Use TX Pin)
-#define RXD2 21
-#define TXD2 22
+// DEFINES
 
-const int ButPin = 32;
+// Midi Serial Pins
+#define MIDI_RXD2 21
+#define MIDI_TXD2 22    // Connect MIDI Port Here
 
-// PIN Assignments
+// Midi Messages
+#define MIDI_MONO 0x2A
+#define MIDI_MONO_CH 0x90
 
-// Rotary Encoder
-const int CLK = 37;    // Pin 7 to clk on encoder
-const int DT = 38;     // Pin 8 to DT on encoder
+#define MIDI_SPEAKERB 0x32
+#define MIDI_SPEAKERB_CH 0xB8
 
-// Buttons
-const int SpeakerBUTPin = 32;     // the number of the pushbutton pin
-const int DimBUTPin = 33;     // the number of the pushbutton pin
-const int MonoBUTPin = 25;     // the number of the pushbutton pin
+#define MIDI_MAINVOL 0x66
+#define MIDI_MAINVOL_CH 0x90
+
+// Encoder Pins
+#define ENCODER_CLOCK 37
+#define ENCODER_DT 38
+#define ENCODER_BUTTON 37
+
+// Button Pins
+#define BUTTON_MUTE 33
+#define BUTTON_MONO 25
+#define BUTTON_SPEAKERB 32
+
+#define TIME_DELAY 100
 
 
-// LEDS
-const int SpeakerLEDPin =  13;      // the number of the LED pin
-const int MonoLEDPin =  11;      // the number of the LED pin
-const int DimLEDPin =  12;      // the number of the LED pin
-
-
-// Global Variables
+// GLOBALS
 
 // Rotary Encoder
 int RotPosition = 0; 
 int rotation;  
-int value;
 
 // Pushbutton Status
-int SpeakerState = 0;         // variable for reading the pushbutton status
-int DimState = 0;            // variable for reading the pushbutton status
-int MonoState = 0;           // variable for reading the pushbutton status
+
 
 // Globals
-int SpeakerB = LOW;
-int Mono = LOW;
-int MainVol = 0;
-int muted = 0;
+bool GLOB_SPEAKERB = LOW;
+bool GLOB_MONO = LOW;
+bool GLOB_MUTED = LOW;
+int GLOB_MAINVOLUME = 0;
+
 
 // Use hardware SPI OLED Display
 auto tft = TFT_eSPI(TFT_WIDTH, TFT_HEIGHT);
@@ -84,25 +90,22 @@ auto tft = TFT_eSPI(TFT_WIDTH, TFT_HEIGHT);
 #define MAIN_BAR_HEIGHT (TFT_WIDTH - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT)
 
 
+/*
+  Function to send MIDI serial data
+*/
 
+void sendMIDI(int cmd, int pitch, int velocity) {
 
-// plays a MIDI note. Doesn't check to see that cmd is greater than 127, or that
-// data values are less than 127:
-void noteOn(int cmd, int pitch, int velocity) {
-
-  // Checks the data passed to the function
-  if (cmd >= 127 || cmd <= 0)
-  {
+  // Check to see if the data is in range
+  if (cmd >= 127 || cmd <= 0) {
     return;
   }
 
-  if (pitch >= 127 || pitch <= 0)
-  {
+  if (pitch >= 127 || pitch <= 0) {
     return;
   }
 
-  if (velocity >= 127 || velocity <= 0)
-  {
+  if (velocity >= 127 || velocity <= 0) {
     return;
   }
 
@@ -112,9 +115,9 @@ void noteOn(int cmd, int pitch, int velocity) {
   Serial2.write(velocity);
 }
 
-
-
-// REFRESH THE DISPLAY ;D
+/*
+  Update the screen with the current values
+*/
 
 void DisplayRefresh(){
 
@@ -122,11 +125,11 @@ void DisplayRefresh(){
   int BACK = TFT_BLACK;
 
   // Muted Screen
-  if (muted == HIGH) {
+  if (GLOB_MUTED == HIGH) {
     MainDisplay = "Muted";
     BACK = TFT_RED;
   } else {
-    MainDisplay = String(MainVol);
+    MainDisplay = String(GLOB_MAINVOLUME);
     BACK = TFT_BLACK;
   }
 
@@ -139,7 +142,7 @@ void DisplayRefresh(){
   tft.setTextSize(1);
 
   // Speaker B Button
-  if (SpeakerB == HIGH) {
+  if (GLOB_SPEAKERB == HIGH) {
     tft.setTextColor(TFT_BLUE, TFT_DARKCYAN);
   } else {
     tft.setTextColor(TFT_BLUE, BACK);
@@ -147,207 +150,141 @@ void DisplayRefresh(){
   tft.drawString("SPK-B", 120, 80, 4);
 
   // Mono Button
-  if (Mono == HIGH) {
+  if (GLOB_MONO == HIGH) {
     tft.setTextColor(TFT_GREEN, TFT_DARKGREEN);
   } else {
     tft.setTextColor(TFT_DARKGREEN, BACK);
   }
   tft.drawString("Mono", TOP_BAR_LOCATION_X, 80, 4);
-
-
-
 }
 
+/*
+  Setup
+*/
 
 void setup()
 {
 
-  // Set MIDI Serial Rate using serial 2
-  Serial2.begin(31250, SERIAL_8N1, RXD2, TXD2);
+  // Set MIDI Serial using Serial 2
+  Serial2.begin(31250, SERIAL_8N1, MIDI_RXD2, MIDI_TXD2);
 
-  // initialize the LED pin as an output:
-  pinMode(SpeakerLEDPin, OUTPUT);
-  pinMode(DimLEDPin, OUTPUT);
-  pinMode(MonoLEDPin, OUTPUT);
   
-  // initialize the pushbutton pin as an input:
-  pinMode(SpeakerBUTPin, INPUT);
-  pinMode(DimBUTPin, INPUT);
-  pinMode(MonoBUTPin, INPUT);
+  // Initialie the buttona
+  pinMode(BUTTON_SPEAKERB, INPUT);
+  pinMode(BUTTON_MUTE, INPUT);
+  pinMode(BUTTON_MONO, INPUT);
 
-  // initialize the rotary encoder
-  pinMode (CLK,INPUT);
-  pinMode (DT,INPUT);
-  rotation = digitalRead(CLK);
+  // Initialize the encoder
+  pinMode (ENCODER_CLOCK,INPUT);
+  pinMode (ENCODER_DT,INPUT);
+  rotation = digitalRead(ENCODER_CLOCK);
 
-  // send the zero voulme command+
-  noteOn(0xB8, 0x66, 0X00);   
+  // Send the main volume to Zero
+  sendMIDI(MIDI_MAINVOL_CH, MIDI_MAINVOL, 0X00);   
 
-  int x = 0;
-  while (x < 4) {
-  digitalWrite(SpeakerLEDPin, HIGH);
-  delay(100);
-  digitalWrite(SpeakerLEDPin, LOW);
-  digitalWrite(DimLEDPin, HIGH);
-  delay(100);
-  digitalWrite(DimLEDPin, LOW);
-  digitalWrite(MonoLEDPin, HIGH);
-  delay(100);
-  digitalWrite(MonoLEDPin, LOW);
-  x++;
-  }
-
-
+  // Initilaize the TFT Display
   tft.init();
   tft.setSwapBytes(true); // Swap the byte order for pushImage() - corrects endianness
   tft.setRotation(1);
   tft.setTextDatum(TL_DATUM); // Top Left
   tft.setTextColor(TEXT_COLOR);
 
-
+  // Update the Display
   DisplayRefresh();
-
 }
 
 
-
-
+/*
+  Main Loop
+*/
 
 void loop()
 {
-
-
   // MAIN VOLUME ENCODER
-   value = digitalRead(CLK);
-   if (muted == 0) {
-     if (value != rotation){ // we use the DT pin to find out which way we turning.
-     if (digitalRead(DT) != value) {  // Clockwise
-      if (RotPosition <= 127)
-      {
-       RotPosition ++;
+  int encClock = digitalRead(ENCODER_CLOCK);
+  if (GLOB_MUTED == 0) {
+    if (encClock != rotation) { // Use the DT pin to find out which way we turning
+      if (digitalRead(ENCODER_DT) != encClock) {  // Clockwise
+        if (RotPosition <= 127) {
+          RotPosition ++;
+        }
+      } else { // Counter clockwise
+        if (RotPosition >= 0)
+        {
+          RotPosition--;
+        }
+      }  
+    } 
+    rotation = encClock;
+
+    if(RotPosition != GLOB_MAINVOLUME) {
+      if(RotPosition >= 0 && RotPosition <= 127) {
+        GLOB_MAINVOLUME = RotPosition;
+        sendMIDI(MIDI_MAINVOL_CH, MIDI_MAINVOL, GLOB_MAINVOLUME);
+        DisplayRefresh();
       }
-       //LeftRight = true;
-     } else { //Counterclockwise
-       //LeftRight = false;
-       if (RotPosition >= 0)
-      {
-       RotPosition--;
-      }
-     }
-     //if (LeftRight){ // turning right will turn on red led.
-       //Serial.println ("clockwise");
-     //}else{        // turning left will turn on green led.   
-       //Serial.println("counterclockwise");
-     //}
-     //Serial.print("Encoder RotPosition: ");
-     //Serial.println(RotPosition);
-     // this will print in the serial monitor.
-     
-   } 
-   rotation = value;
-
-   if(RotPosition != MainVol)
-   {
-    if(RotPosition >= 0 && RotPosition <= 127)
-    {
-    MainVol = RotPosition;
-    noteOn(0xB8, 0x66, MainVol);
-    DisplayRefresh();
     }
-   
-   }
-     /*  if (MainVol <= 0)
-    {
-      digitalWrite(DimLEDPin, HIGH);
-    } else {
-      digitalWrite(DimLEDPin, LOW);
-    }*/
-   }
-
-
-  // READ BUTTONS
-  SpeakerState = digitalRead(SpeakerBUTPin);
-  DimState = digitalRead(DimBUTPin);
-  MonoState = digitalRead(MonoBUTPin);
-
-  // SPEAKER B
-  if (SpeakerState == HIGH) {
-    
-    // turn LED on:
-    if (SpeakerB == HIGH) {
-      digitalWrite(SpeakerLEDPin, LOW);
-      SpeakerB = LOW;
-    } else {
-      digitalWrite(SpeakerLEDPin, HIGH);
-      SpeakerB = HIGH;
-    }
-    
-    
-    int note = 0x32; // SPEAKER B
-    DisplayRefresh();
-    //Note on channel 1 (0x90), some note value (note), middle velocity (0x45):
-    noteOn(0x90, note, 0x7F);
-    delay(100);
-    
-    //Note on channel 1 (0x90), some note value (note), silent velocity (0x00):
-    noteOn(0x90, note, 0x00);
-    delay(200);
-    
   }
 
-  // DIM
-   if (DimState == HIGH) {
+  // READ BUTTONS
+  bool stateMuted = digitalRead(BUTTON_MUTE);
+  bool stateSpeakerB = digitalRead(BUTTON_SPEAKERB);
+  bool stateMono = digitalRead(BUTTON_MONO);
 
-    if (muted == 0)
-    {
-      muted = 1;
+  // MUTE
+  if (stateMuted == HIGH) {
 
-      // turn LED on:
-      digitalWrite(DimLEDPin, HIGH);
-      noteOn(0xB8, 0x66, 0);
-      delay(200);
+    if (GLOB_MUTED == 0) {
+      GLOB_MUTED = 1;
+
+      sendMIDI(MIDI_MAINVOL_CH, MIDI_MAINVOL, 0);
       DisplayRefresh();
   
     } else {
-      muted = 0;
-      digitalWrite(DimLEDPin, LOW);
-      noteOn(0xB8, 0x66, MainVol);
-      delay(200);
+      GLOB_MUTED = 0;
+
+      sendMIDI(MIDI_MAINVOL_CH, MIDI_MAINVOL, GLOB_MAINVOLUME);
       DisplayRefresh();
     }
   }
 
-  // MONO
-   if (MonoState == HIGH) {
-    
-    // turn LED on:
-    //digitalWrite(MonoLEDPin, HIGH);
+  // SPEAKER B
+  if (stateSpeakerB == HIGH) {
 
-    if (Mono == HIGH) {
-      digitalWrite(MonoLEDPin, LOW);
-      Mono = LOW;
+    // Flip the state
+    if (GLOB_SPEAKERB == HIGH) {
+      GLOB_SPEAKERB = LOW;
     } else {
-      digitalWrite(MonoLEDPin, HIGH);
-      Mono = HIGH;
+      GLOB_SPEAKERB = HIGH;
     }
     
-    int note = 0x2A; // MONO
-    
-    //Note on channel 1 (0x90), some note value (note), middle velocity (0x45):
-    noteOn(0x90, note, 0x7F);
-    delay(100);
-    
-    //Note on channel 1 (0x90), some note value (note), silent velocity (0x00):
-    noteOn(0x90, note, 0x00);
-    delay(200);
     DisplayRefresh();
+
+    // Send MIDI Note ON
+    sendMIDI(MIDI_SPEAKERB_CH, MIDI_SPEAKERB, 0x7F);
+    delay(TIME_DELAY);
     
-  } else {
-    //digitalWrite(MonoLEDPin, LOW);
+    // Send MIDI Note OFF
+    sendMIDI(MIDI_SPEAKERB_CH, MIDI_SPEAKERB, 0x00);
   }
 
+  // MONO
+  if (stateMono == HIGH) {
+    
+    // Flip the state
+    if (GLOB_MONO == HIGH) {
+      GLOB_MONO = LOW;
+    } else {
+      GLOB_MONO = HIGH;
+    }
 
+    DisplayRefresh();
+    
+    // Send MIDI Note ON
+    sendMIDI(MIDI_MONO_CH, MIDI_MONO, 0x7F);
+    delay(TIME_DELAY);
+    
+    // Send MIDI Note OFF
+    sendMIDI(MIDI_MONO_CH, MIDI_MONO, 0x00);
+  }
 }
-
-
-// this is a test brannch
