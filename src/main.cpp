@@ -24,10 +24,10 @@ TOTAL MIX ESP32 Controller
 #define MIDI_MONO_CH 0x90
 
 #define MIDI_SPEAKERB 0x32
-#define MIDI_SPEAKERB_CH 0xB8
+#define MIDI_SPEAKERB_CH 0x90
 
 #define MIDI_MAINVOL 0x66
-#define MIDI_MAINVOL_CH 0x90
+#define MIDI_MAINVOL_CH 0xB8
 
 // Encoder Pins
 #define ENCODER_CLOCK 37
@@ -40,7 +40,7 @@ TOTAL MIX ESP32 Controller
 #define BUTTON_SPEAKERB 32
 
 // Delay between MIDI On and Off messages
-#define TIME_DELAY 100
+#define TIME_DELAY 200
 
 // Settings for display drawing
 #define DISPLAY_COLOUR TFT_BLACK
@@ -83,9 +83,16 @@ auto tft = TFT_eSPI(TFT_WIDTH, TFT_HEIGHT);
 void sendMIDI(int cmd, int pitch, int velocity) {
 
   // Check to see if the data is in range
-  if (cmd >= 127 || cmd <= 0) { return; }
-  if (pitch >= 127 || pitch <= 0) { return; }
-  if (velocity >= 127 || velocity <= 0) { return; }
+  /*if (cmd > 127 || cmd < 0) { 
+    return; 
+  }
+  if (pitch > 127 || pitch < 0) { 
+    return; 
+  }
+  if (velocity > 127 || velocity < 0) { 
+    return; 
+  }
+  */
 
   // Send MIDI
   Serial2.write(cmd);
@@ -224,6 +231,8 @@ void loop() {
       sendMIDI(MIDI_MAINVOL_CH, MIDI_MAINVOL, GLOB_MAINVOLUME);
       DisplayRefresh();
     }
+    delay(TIME_DELAY);
+
   }
 
   // SPEAKER B
